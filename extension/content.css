@@ -1,0 +1,275 @@
+/* TrustLens Content Script Styles */
+
+/* Ensure our widgets don't interfere with page styles */
+#trustlens-widget,
+#trustlens-news-indicator {
+    all: initial;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    box-sizing: border-box !important;
+}
+
+/* Reset any inherited styles */
+#trustlens-widget *,
+#trustlens-news-indicator * {
+    all: unset;
+    display: revert;
+    box-sizing: border-box;
+}
+
+/* Widget positioning and base styles */
+#trustlens-widget {
+    position: fixed !important;
+    top: 20px !important;
+    right: 20px !important;
+    z-index: 2147483647 !important; /* Maximum z-index */
+    background: white !important;
+    border: 1px solid #ddd !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    font-size: 14px !important;
+    max-width: 250px !important;
+    animation: trustlens-slideIn 0.3s ease-out !important;
+}
+
+@keyframes trustlens-slideIn {
+    from { 
+        transform: translateX(100%) !important; 
+        opacity: 0 !important; 
+    }
+    to { 
+        transform: translateX(0) !important; 
+        opacity: 1 !important; 
+    }
+}
+
+@keyframes trustlens-slideOut {
+    from { 
+        transform: translateX(0) !important; 
+        opacity: 1 !important; 
+    }
+    to { 
+        transform: translateX(100%) !important; 
+        opacity: 0 !important; 
+    }
+}
+
+.trustlens-widget-content {
+    padding: 15px !important;
+}
+
+.trustlens-header {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    margin-bottom: 10px !important;
+    padding-bottom: 8px !important;
+    border-bottom: 1px solid #eee !important;
+}
+
+.trustlens-logo {
+    font-size: 16px !important;
+    margin-right: 6px !important;
+}
+
+.trustlens-title {
+    font-weight: 600 !important;
+    color: #333 !important;
+    flex: 1 !important;
+}
+
+.trustlens-close {
+    background: none !important;
+    border: none !important;
+    font-size: 18px !important;
+    cursor: pointer !important;
+    color: #999 !important;
+    padding: 0 !important;
+    width: 20px !important;
+    height: 20px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+.trustlens-close:hover {
+    color: #666 !important;
+}
+
+.trustlens-body {
+    text-align: center !important;
+}
+
+.trustlens-domain {
+    font-weight: 500 !important;
+    color: #333 !important;
+    margin-bottom: 8px !important;
+    word-break: break-all !important;
+}
+
+.trustlens-rating {
+    margin-bottom: 6px !important;
+}
+
+.trustlens-rating-value {
+    font-size: 24px !important;
+    font-weight: 700 !important;
+    color: #667eea !important;
+}
+
+.trustlens-rating-label {
+    color: #666 !important;
+    font-size: 14px !important;
+}
+
+.trustlens-votes {
+    color: #666 !important;
+    font-size: 12px !important;
+    margin-bottom: 8px !important;
+}
+
+.trustlens-reliability {
+    padding: 4px 8px !important;
+    border-radius: 4px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    text-transform: uppercase !important;
+    margin-bottom: 10px !important;
+}
+
+.trustlens-reliability.reliable {
+    background: #d4edda !important;
+    color: #155724 !important;
+}
+
+.trustlens-reliability.mixed {
+    background: #fff3cd !important;
+    color: #856404 !important;
+}
+
+.trustlens-reliability.unreliable {
+    background: #f8d7da !important;
+    color: #721c24 !important;
+}
+
+.trustlens-rate-btn {
+    background: #667eea !important;
+    color: white !important;
+    border: none !important;
+    padding: 8px 16px !important;
+    border-radius: 4px !important;
+    font-size: 12px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    width: 100% !important;
+    transition: background 0.2s ease !important;
+}
+
+.trustlens-rate-btn:hover {
+    background: #5a6fd8 !important;
+}
+
+/* News indicator styles */
+#trustlens-news-indicator {
+    position: fixed !important;
+    top: 10px !important;
+    left: 10px !important;
+    z-index: 2147483646 !important; /* Just below widget */
+    pointer-events: none !important;
+}
+
+.trustlens-news-badge {
+    background: rgba(102, 126, 234, 0.9) !important;
+    color: white !important;
+    padding: 6px 12px !important;
+    border-radius: 20px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important;
+    animation: trustlens-fadeIn 0.5s ease-out !important;
+}
+
+@keyframes trustlens-fadeIn {
+    from { 
+        opacity: 0 !important; 
+        transform: translateY(-10px) !important; 
+    }
+    to { 
+        opacity: 1 !important; 
+        transform: translateY(0) !important; 
+    }
+}
+
+@keyframes trustlens-fadeOut {
+    from { 
+        opacity: 1 !important; 
+        transform: translateY(0) !important; 
+    }
+    to { 
+        opacity: 0 !important; 
+        transform: translateY(-10px) !important; 
+    }
+}
+
+.trustlens-news-icon {
+    font-size: 14px !important;
+}
+
+.trustlens-news-text {
+    font-size: 11px !important;
+}
+
+/* Ensure our elements are always visible and not affected by page styles */
+#trustlens-widget,
+#trustlens-news-indicator,
+#trustlens-widget *,
+#trustlens-news-indicator * {
+    visibility: visible !important;
+    display: block !important;
+    position: static !important;
+    float: none !important;
+    clear: none !important;
+    overflow: visible !important;
+    clip: auto !important;
+    clip-path: none !important;
+    mask: none !important;
+    -webkit-mask: none !important;
+}
+
+/* Specific overrides for common page styles that might interfere */
+#trustlens-widget {
+    transform: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    mix-blend-mode: normal !important;
+    isolation: auto !important;
+}
+
+/* Ensure text is readable */
+#trustlens-widget,
+#trustlens-widget * {
+    color: inherit !important;
+    text-shadow: none !important;
+    -webkit-text-stroke: none !important;
+}
+
+/* Button and interactive element overrides */
+.trustlens-close,
+.trustlens-rate-btn {
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
+    outline: none !important;
+    text-decoration: none !important;
+}
+
+.trustlens-close:focus,
+.trustlens-rate-btn:focus {
+    outline: 2px solid #667eea !important;
+    outline-offset: 2px !important;
+}
