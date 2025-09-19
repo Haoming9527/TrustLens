@@ -1,7 +1,8 @@
 // TrustLens Content Script
 class TrustLensContent {
     constructor() {
-        this.apiBaseUrl = 'http://localhost:3000/api';
+        this.supabaseUrl = window.TRUSTLENS_CONFIG?.SUPABASE_URL || 'YOUR_SUPABASE_URL';
+        this.supabaseKey = window.TRUSTLENS_CONFIG?.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
         this.currentDomain = null;
         this.ratingWidget = null;
         
@@ -47,6 +48,9 @@ class TrustLensContent {
                         isNews: this.isNewsWebsite()
                     });
                     break;
+                case 'loadDomainRating':
+                    this.loadDomainRating(request.domain).then(sendResponse);
+                    return true; // Keep message channel open for async response
             }
         });
     }
@@ -235,6 +239,27 @@ class TrustLensContent {
         }, 5000);
     }
 
+    async loadDomainRating(domain) {
+        try {
+            const response = await fetch(`${this.supabaseUrl}/rest/v1/news_data?domain=eq.${encodeURIComponent(domain)}&select=*`, {
+                headers: {
+                    'apikey': this.supabaseKey,
+                    'Authorization': `Bearer ${this.supabaseKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                return data && data.length > 0 ? data[0] : null;
+            }
+            return null;
+        } catch (error) {
+            console.error('Error loading domain rating:', error);
+            return null;
+        }
+    }
+
     injectRatingWidget(domain, rating) {
         // Remove existing widget
         const existingWidget = document.getElementById('trustlens-widget');
@@ -257,12 +282,12 @@ class TrustLensContent {
                         <span class="trustlens-rating-value">${rating.rating.toFixed(1)}</span>
                         <span class="trustlens-rating-label">/ 10</span>
                     </div>
-                    <div class="trustlens-votes">${rating.total_votes} community votes</div>
+                    <div class="trustlens-source">Database Rating</div>
                     <div class="trustlens-reliability ${rating.rating >= 7 ? 'reliable' : rating.rating >= 4 ? 'mixed' : 'unreliable'}">
                         ${rating.rating >= 7 ? 'Reliable' : rating.rating >= 4 ? 'Mixed' : 'Unreliable'}
                     </div>
-                    <button class="trustlens-rate-btn" onclick="window.open('chrome-extension://${chrome.runtime.id}/popup.html', '_blank')">
-                        Rate This Site
+                    <button class="trustlens-view-btn" onclick="window.open('chrome-extension://${chrome.runtime.id}/popup.html', '_blank')">
+                        View Details
                     </button>
                 </div>
             </div>
@@ -359,7 +384,7 @@ class TrustLensContent {
                 font-size: 14px;
             }
             
-            .trustlens-votes {
+            .trustlens-source {
                 color: #666;
                 font-size: 12px;
                 margin-bottom: 8px;
@@ -389,7 +414,7 @@ class TrustLensContent {
                 color: #721c24;
             }
             
-            .trustlens-rate-btn {
+            .trustlens-view-btn {
                 background: #667eea;
                 color: white;
                 border: none;
@@ -402,7 +427,7 @@ class TrustLensContent {
                 transition: background 0.2s ease;
             }
             
-            .trustlens-rate-btn:hover {
+            .trustlens-view-btn:hover {
                 background: #5a6fd8;
             }
         `;

@@ -2,6 +2,23 @@
   "name": "trustlens-backend",
   "version": "1.0.0",
   "description": "Backend API for TrustLens - Community-Powered Misinformation Defense Platform",
+  "keywords": [
+    "misinformation",
+    "fact-checking",
+    "community",
+    "browser-extension"
+  ],
+  "homepage": "https://github.com/Haoming9527/TrustLens#readme",
+  "bugs": {
+    "url": "https://github.com/Haoming9527/TrustLens/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Haoming9527/TrustLens.git"
+  },
+  "license": "MIT",
+  "author": "TrustLens Team",
+  "type": "commonjs",
   "main": "server.js",
   "scripts": {
     "start": "node server-supabase.js",
@@ -10,9 +27,6 @@
     "dev:sqlite": "nodemon server.js",
     "test": "jest"
   },
-  "keywords": ["misinformation", "fact-checking", "community", "browser-extension"],
-  "author": "TrustLens Team",
-  "license": "MIT",
   "dependencies": {
     "express": "^4.18.2",
     "cors": "^2.8.5",

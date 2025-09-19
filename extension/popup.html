@@ -33,40 +33,42 @@
             <div class="rating-text" id="ratingText">No rating available</div>
         </div>
 
-        <div class="rating-section" id="ratingSection">
-            <h3>Rate this website</h3>
-            <div class="rating-input">
-                <div class="rating-scale">
-                    <span class="scale-label">Unreliable</span>
-                    <div class="rating-buttons" id="ratingButtons">
-                        <button class="rating-btn" data-rating="1">1</button>
-                        <button class="rating-btn" data-rating="2">2</button>
-                        <button class="rating-btn" data-rating="3">3</button>
-                        <button class="rating-btn" data-rating="4">4</button>
-                        <button class="rating-btn" data-rating="5">5</button>
-                        <button class="rating-btn" data-rating="6">6</button>
-                        <button class="rating-btn" data-rating="7">7</button>
-                        <button class="rating-btn" data-rating="8">8</button>
-                        <button class="rating-btn" data-rating="9">9</button>
-                        <button class="rating-btn" data-rating="10">10</button>
-                    </div>
-                    <span class="scale-label">Highly Reliable</span>
+        <div class="domain-info-section" id="domainInfoSection">
+            <h3>Domain Information</h3>
+            <div class="domain-details">
+                <div class="info-item">
+                    <span class="info-label">Source:</span>
+                    <span class="info-value" id="ratingSource">TrustLens Database</span>
                 </div>
-                <button class="submit-btn" id="submitRating" disabled>Submit Rating</button>
+                <div class="info-item">
+                    <span class="info-label">Last Updated:</span>
+                    <span class="info-value" id="lastUpdated">-</span>
+                </div>
             </div>
         </div>
 
         <div class="status-message" id="statusMessage"></div>
+        
+        <div class="debug-section" id="debugSection" style="display: none;">
+            <h3>Debug Information</h3>
+            <div class="debug-info" id="debugInfo">
+                <div>Domain: <span id="debugDomain">-</span></div>
+                <div>Supabase URL: <span id="debugUrl">-</span></div>
+                <div>API Key: <span id="debugKey">-</span></div>
+                <div>Connection: <span id="debugConnection">-</span></div>
+            </div>
+            <button id="debugToggle" class="debug-btn">Hide Debug</button>
+        </div>
 
         <div class="footer">
             <div class="stats">
                 <div class="stat">
                     <span class="stat-number" id="totalDomains">-</span>
-                    <span class="stat-label">Domains Rated</span>
+                    <span class="stat-label">Domains in Database</span>
                 </div>
                 <div class="stat">
-                    <span class="stat-number" id="totalVotes">-</span>
-                    <span class="stat-label">Total Votes</span>
+                    <span class="stat-number" id="avgRating">-</span>
+                    <span class="stat-label">Average Rating</span>
                 </div>
             </div>
             <div class="links">
@@ -76,6 +78,8 @@
         </div>
     </div>
 
+    <script src="config.js"></script>
+    <script src="mock-data.js"></script>
     <script src="popup.js"></script>
 </body>
 </html>

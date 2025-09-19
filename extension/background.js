@@ -1,7 +1,8 @@
 // TrustLens Background Script
 class TrustLensBackground {
     constructor() {
-        this.apiBaseUrl = 'http://localhost:3000/api';
+        this.supabaseUrl = 'YOUR_SUPABASE_URL'; // Will be set from config
+        this.supabaseKey = 'YOUR_SUPABASE_ANON_KEY'; // Will be set from config
         this.init();
     }
 
@@ -37,12 +38,12 @@ class TrustLensBackground {
                     this.getDomainRating(request.domain).then(sendResponse);
                     return true; // Will respond asynchronously
                 
-                case 'submitRating':
-                    this.submitRating(request.domain, request.rating, request.userId).then(sendResponse);
-                    return true;
-                
                 case 'getStats':
                     this.getStats().then(sendResponse);
+                    return true;
+                
+                case 'testSupabaseConnection':
+                    this.testSupabaseConnection(request.url, request.key).then(sendResponse);
                     return true;
             }
         });
@@ -75,9 +76,17 @@ class TrustLensBackground {
 
     async getDomainRating(domain) {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/rating/${encodeURIComponent(domain)}`);
+            const response = await fetch(`${this.supabaseUrl}/rest/v1/news_data?domain=eq.${encodeURIComponent(domain)}&select=*`, {
+                headers: {
+                    'apikey': this.supabaseKey,
+                    'Authorization': `Bearer ${this.supabaseKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             if (response.ok) {
-                return await response.json();
+                const data = await response.json();
+                return data && data.length > 0 ? data[0] : null;
             }
             return null;
         } catch (error) {
@@ -86,37 +95,52 @@ class TrustLensBackground {
         }
     }
 
-    async submitRating(domain, rating, userId) {
-        try {
-            const response = await fetch(`${this.apiBaseUrl}/rating`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    domain: domain,
-                    rating: rating,
-                    user_id: userId
-                })
-            });
 
+    async testSupabaseConnection(url, key) {
+        try {
+            console.log('Background: Testing Supabase connection...');
+            const testUrl = `${url}/rest/v1/news_data?select=*&limit=3`;
+            
+            const response = await fetch(testUrl, {
+                headers: {
+                    'apikey': key,
+                    'Authorization': `Bearer ${key}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
             if (response.ok) {
-                return await response.json();
+                const data = await response.json();
+                console.log('Background: Supabase test successful!', data);
+                return { success: true, data: data };
             } else {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to submit rating');
+                const errorText = await response.text();
+                console.error('Background: Supabase test failed:', response.status, errorText);
+                return { success: false, error: `HTTP ${response.status}: ${errorText}` };
             }
         } catch (error) {
-            console.error('Error submitting rating:', error);
-            throw error;
+            console.error('Background: Supabase test error:', error);
+            return { success: false, error: error.message };
         }
     }
 
     async getStats() {
         try {
             const [topRated, lowestRated] = await Promise.all([
-                fetch(`${this.apiBaseUrl}/domains/top?limit=5`).then(r => r.json()),
-                fetch(`${this.apiBaseUrl}/domains/lowest?limit=5`).then(r => r.json())
+                fetch(`${this.supabaseUrl}/rest/v1/news_data?select=*&order=rating.desc&limit=5`, {
+                    headers: {
+                        'apikey': this.supabaseKey,
+                        'Authorization': `Bearer ${this.supabaseKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                }).then(r => r.json()),
+                fetch(`${this.supabaseUrl}/rest/v1/news_data?select=*&order=rating.asc&limit=5`, {
+                    headers: {
+                        'apikey': this.supabaseKey,
+                        'Authorization': `Bearer ${this.supabaseKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                }).then(r => r.json())
             ]);
 
             return {
@@ -182,7 +206,7 @@ class TrustLensBackground {
                         <span class="trustlens-rating-value">${rating.rating.toFixed(1)}</span>
                         <span class="trustlens-rating-label">/ 10</span>
                     </div>
-                    <div class="trustlens-votes">${rating.total_votes} community votes</div>
+                    <div class="trustlens-source">Database Rating</div>
                     <div class="trustlens-reliability ${rating.rating >= 7 ? 'reliable' : rating.rating >= 4 ? 'mixed' : 'unreliable'}">
                         ${rating.rating >= 7 ? 'Reliable' : rating.rating >= 4 ? 'Mixed' : 'Unreliable'}
                     </div>
@@ -281,7 +305,7 @@ class TrustLensBackground {
                 font-size: 14px;
             }
             
-            .trustlens-votes {
+            .trustlens-source {
                 color: #666;
                 font-size: 12px;
                 margin-bottom: 8px;
@@ -333,7 +357,7 @@ class TrustLensBackground {
             type: 'basic',
             iconUrl: 'icons/icon48.png',
             title: 'TrustLens Installed',
-            message: 'Welcome to TrustLens! Rate news websites and help fight misinformation.'
+            message: 'Welcome to TrustLens! View domain ratings and help identify reliable news sources.'
         });
     }
 }

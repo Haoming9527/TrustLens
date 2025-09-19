@@ -41,43 +41,27 @@ const db = new sqlite3.Database('./trustlens.db', (err) => {
 // Initialize database schema
 function initializeDatabase() {
   db.serialize(() => {
-    // Create news_data table
+    // Create simplified news_data table (domain, rating)
     db.run(`
       CREATE TABLE IF NOT EXISTS news_data (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         domain TEXT UNIQUE NOT NULL,
         rating REAL NOT NULL,
-        total_votes INTEGER DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
-    // Create votes table for tracking individual votes
-    db.run(`
-      CREATE TABLE IF NOT EXISTS votes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        domain TEXT NOT NULL,
-        rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 10),
-        user_id TEXT,
-        ip_address TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE(domain, user_id, ip_address)
-      )
-    `);
-
-    // Create indexes for better performance
+    // Indexes
     db.run('CREATE INDEX IF NOT EXISTS idx_domain ON news_data(domain)');
     db.run('CREATE INDEX IF NOT EXISTS idx_rating ON news_data(rating)');
-    db.run('CREATE INDEX IF NOT EXISTS idx_votes_domain ON votes(domain)');
   });
 }
 
 // Validation schemas
 const ratingSchema = Joi.object({
   domain: Joi.string().domain().required(),
-  rating: Joi.number().integer().min(1).max(10).required(),
-  user_id: Joi.string().optional()
+  rating: Joi.number().min(1).max(10).required()
 });
 
 // Routes
@@ -96,7 +80,7 @@ app.get('/api/rating/:domain', (req, res) => {
   }
 
   db.get(
-    'SELECT domain, rating, total_votes, updated_at FROM news_data WHERE domain = ?',
+    'SELECT domain, rating, updated_at FROM news_data WHERE domain = ?',
     [domain],
     (err, row) => {
       if (err) {
@@ -108,56 +92,41 @@ app.get('/api/rating/:domain', (req, res) => {
         return res.status(404).json({ error: 'Domain not found' });
       }
       
-      res.json({
-        domain: row.domain,
-        rating: row.rating,
-        total_votes: row.total_votes,
-        last_updated: row.updated_at
-      });
+      res.json({ domain: row.domain, rating: row.rating, last_updated: row.updated_at });
     }
   );
 });
 
-// Submit a rating for a domain
-app.post('/api/rating', (req, res) => {
+// Create or update rating for a domain (no voting, direct set)
+app.put('/api/rating', (req, res) => {
   const { error, value } = ratingSchema.validate(req.body);
-  
-  if (error) {
-    return res.status(400).json({ error: error.details[0].message });
-  }
+  if (error) return res.status(400).json({ error: error.details[0].message });
 
-  const { domain, rating, user_id } = value;
-  const ip_address = req.ip || req.connection.remoteAddress;
+  const { domain, rating } = value;
 
-  // Check if domain already exists
-  db.get('SELECT * FROM news_data WHERE domain = ?', [domain], (err, existingRow) => {
-    if (err) {
-      console.error('Database error:', err);
-      return res.status(500).json({ error: 'Internal server error' });
+  db.run(
+    'INSERT INTO news_data (domain, rating) VALUES (?, ?) ON CONFLICT(domain) DO UPDATE SET rating = excluded.rating, updated_at = CURRENT_TIMESTAMP',
+    [domain, rating],
+    function(err) {
+      if (err) {
+        console.error('Database error:', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+      return res.json({ message: 'Rating saved', domain, rating });
     }
-
-    if (existingRow) {
-      // Update existing rating
-      updateRating(domain, rating, user_id, ip_address, res);
-    } else {
-      // Insert new rating
-      insertNewRating(domain, rating, user_id, ip_address, res);
-    }
-  });
+  );
 });
 
 // Get top rated domains
 app.get('/api/domains/top', (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
-  const minVotes = parseInt(req.query.min_votes) || 5;
 
   db.all(
-    `SELECT domain, rating, total_votes, updated_at 
+    `SELECT domain, rating, updated_at 
      FROM news_data 
-     WHERE total_votes >= ? 
-     ORDER BY rating DESC, total_votes DESC 
+     ORDER BY rating DESC 
      LIMIT ?`,
-    [minVotes, limit],
+    [limit],
     (err, rows) => {
       if (err) {
         console.error('Database error:', err);
@@ -172,15 +141,13 @@ app.get('/api/domains/top', (req, res) => {
 // Get lowest rated domains
 app.get('/api/domains/lowest', (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
-  const minVotes = parseInt(req.query.min_votes) || 5;
 
   db.all(
-    `SELECT domain, rating, total_votes, updated_at 
+    `SELECT domain, rating, updated_at 
      FROM news_data 
-     WHERE total_votes >= ? 
-     ORDER BY rating ASC, total_votes DESC 
+     ORDER BY rating ASC 
      LIMIT ?`,
-    [minVotes, limit],
+    [limit],
     (err, rows) => {
       if (err) {
         console.error('Database error:', err);
@@ -198,87 +165,7 @@ function isValidDomain(domain) {
   return domainRegex.test(domain);
 }
 
-function updateRating(domain, rating, user_id, ip_address, res) {
-  // First, try to insert the vote
-  db.run(
-    'INSERT OR IGNORE INTO votes (domain, rating, user_id, ip_address) VALUES (?, ?, ?, ?)',
-    [domain, rating, user_id, ip_address],
-    function(err) {
-      if (err) {
-        console.error('Error inserting vote:', err);
-        return res.status(500).json({ error: 'Failed to record vote' });
-      }
-
-      if (this.changes === 0) {
-        return res.status(409).json({ error: 'Vote already recorded for this domain' });
-      }
-
-      // Recalculate average rating
-      db.get(
-        'SELECT AVG(rating) as avg_rating, COUNT(*) as total_votes FROM votes WHERE domain = ?',
-        [domain],
-        (err, result) => {
-          if (err) {
-            console.error('Error calculating average:', err);
-            return res.status(500).json({ error: 'Failed to update rating' });
-          }
-
-          // Update the news_data table
-          db.run(
-            'UPDATE news_data SET rating = ?, total_votes = ?, updated_at = CURRENT_TIMESTAMP WHERE domain = ?',
-            [result.avg_rating, result.total_votes, domain],
-            (err) => {
-              if (err) {
-                console.error('Error updating news_data:', err);
-                return res.status(500).json({ error: 'Failed to update rating' });
-              }
-
-              res.json({
-                message: 'Rating updated successfully',
-                domain: domain,
-                new_rating: result.avg_rating,
-                total_votes: result.total_votes
-              });
-            }
-          );
-        }
-      );
-    }
-  );
-}
-
-function insertNewRating(domain, rating, user_id, ip_address, res) {
-  // Insert the vote
-  db.run(
-    'INSERT INTO votes (domain, rating, user_id, ip_address) VALUES (?, ?, ?, ?)',
-    [domain, rating, user_id, ip_address],
-    function(err) {
-      if (err) {
-        console.error('Error inserting vote:', err);
-        return res.status(500).json({ error: 'Failed to record vote' });
-      }
-
-      // Insert into news_data
-      db.run(
-        'INSERT INTO news_data (domain, rating, total_votes) VALUES (?, ?, 1)',
-        [domain, rating],
-        function(err) {
-          if (err) {
-            console.error('Error inserting news_data:', err);
-            return res.status(500).json({ error: 'Failed to create domain entry' });
-          }
-
-          res.json({
-            message: 'Rating created successfully',
-            domain: domain,
-            rating: rating,
-            total_votes: 1
-          });
-        }
-      );
-    }
-  );
-}
+// Removed voting helper functions
 
 // Error handling middleware
 app.use((err, req, res, next) => {

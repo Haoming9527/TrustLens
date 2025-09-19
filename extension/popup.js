@@ -1,9 +1,9 @@
 // TrustLens Popup Script
 class TrustLensPopup {
     constructor() {
-        this.apiBaseUrl = 'http://localhost:3000/api';
+        this.supabaseUrl = window.TRUSTLENS_CONFIG?.SUPABASE_URL || 'YOUR_SUPABASE_URL';
+        this.supabaseKey = window.TRUSTLENS_CONFIG?.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
         this.currentDomain = null;
-        this.selectedRating = null;
         this.currentRating = null;
         
         this.init();
@@ -12,6 +12,7 @@ class TrustLensPopup {
     async init() {
         await this.getCurrentTab();
         this.setupEventListeners();
+        await this.testSupabaseConnection();
         await this.loadCurrentSiteRating();
         await this.loadStats();
     }
@@ -19,9 +20,16 @@ class TrustLensPopup {
     async getCurrentTab() {
         try {
             const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+            console.log('TrustLens Debug: Current tab:', tab);
+            
             if (tab && tab.url) {
                 this.currentDomain = this.extractDomain(tab.url);
+                console.log('TrustLens Debug: Extracted domain:', this.currentDomain);
+                console.log('TrustLens Debug: Full URL:', tab.url);
                 document.getElementById('currentDomain').textContent = this.currentDomain;
+            } else {
+                console.log('TrustLens Debug: No tab or URL found');
+                this.showStatus('No active tab found', 'error');
             }
         } catch (error) {
             console.error('Error getting current tab:', error);
@@ -39,18 +47,6 @@ class TrustLensPopup {
     }
 
     setupEventListeners() {
-        // Rating button clicks
-        document.querySelectorAll('.rating-btn').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                this.selectRating(parseInt(e.target.dataset.rating));
-            });
-        });
-
-        // Submit button
-        document.getElementById('submitRating').addEventListener('click', () => {
-            this.submitRating();
-        });
-
         // Footer links
         document.getElementById('viewTopRated').addEventListener('click', (e) => {
             e.preventDefault();
@@ -61,52 +57,218 @@ class TrustLensPopup {
             e.preventDefault();
             this.showLowestRated();
         });
-    }
 
-    selectRating(rating) {
-        this.selectedRating = rating;
-        
-        // Update button states
-        document.querySelectorAll('.rating-btn').forEach(btn => {
-            btn.classList.remove('selected');
+        // Debug toggle
+        document.getElementById('debugToggle').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.toggleDebug();
         });
-        document.querySelector(`[data-rating="${rating}"]`).classList.add('selected');
-        
-        // Enable submit button
-        document.getElementById('submitRating').disabled = false;
+
+        // Keyboard shortcut for debug (Ctrl+D)
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'd') {
+                e.preventDefault();
+                this.toggleDebug();
+            }
+        });
     }
 
-    async loadCurrentSiteRating() {
-        if (!this.currentDomain) return;
+    toggleDebug() {
+        const debugSection = document.getElementById('debugSection');
+        const debugToggle = document.getElementById('debugToggle');
+        
+        if (debugSection.style.display === 'none') {
+            debugSection.style.display = 'block';
+            debugToggle.textContent = 'Hide Debug';
+        } else {
+            debugSection.style.display = 'none';
+            debugToggle.textContent = 'Show Debug';
+        }
+    }
 
+    async testSupabaseConnection() {
+        console.log('TrustLens Debug: Testing Supabase connection...');
+        console.log('TrustLens Debug: Config loaded:', window.TRUSTLENS_CONFIG);
+        
+        // Update debug info
+        this.updateDebugInfo();
+        
         try {
-            const response = await fetch(`${this.apiBaseUrl}/rating/${encodeURIComponent(this.currentDomain)}`);
+            // Test 1: Basic table access with different approach
+            console.log('TrustLens Debug: Test 1 - Basic table access');
+            const testUrl = `${this.supabaseUrl}/rest/v1/news_data?select=*&limit=5`;
+            console.log('TrustLens Debug: Test URL:', testUrl);
+            
+            // Try with different fetch options
+            const fetchOptions = {
+                method: 'GET',
+                headers: {
+                    'apikey': this.supabaseKey,
+                    'Authorization': `Bearer ${this.supabaseKey}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                mode: 'cors',
+                cache: 'no-cache'
+            };
+            
+            console.log('TrustLens Debug: Fetch options:', fetchOptions);
+            
+            const response = await fetch(testUrl, fetchOptions);
+            
+            console.log('TrustLens Debug: Test response status:', response.status);
+            console.log('TrustLens Debug: Response headers:', Object.fromEntries(response.headers.entries()));
             
             if (response.ok) {
                 const data = await response.json();
-                this.currentRating = data.rating;
-                this.updateRatingDisplay(data);
-            } else if (response.status === 404) {
-                this.updateRatingDisplay(null);
+                console.log('TrustLens Debug: Test successful! Data:', data);
+                console.log('TrustLens Debug: Number of records:', data.length);
+                
+                if (data.length > 0) {
+                    console.log('TrustLens Debug: Sample record:', data[0]);
+                    this.showStatus(`Supabase connected! Found ${data.length} records`, 'success');
+                    document.getElementById('debugConnection').textContent = `Connected ✓ (${data.length} records)`;
+                    document.getElementById('debugConnection').style.color = 'green';
+                } else {
+                    this.showStatus('Supabase connected but no data found', 'info');
+                    document.getElementById('debugConnection').textContent = 'Connected ✓ (no data)';
+                    document.getElementById('debugConnection').style.color = 'orange';
+                }
             } else {
-                throw new Error('Failed to load rating');
+                const errorText = await response.text();
+                console.error('TrustLens Debug: Test failed:', response.status, errorText);
+                this.showStatus(`Supabase test failed: ${response.status} - ${errorText}`, 'error');
+                document.getElementById('debugConnection').textContent = `Failed (${response.status})`;
+                document.getElementById('debugConnection').style.color = 'red';
             }
         } catch (error) {
-            console.error('Error loading rating:', error);
-            this.showStatus('Error loading rating', 'error');
+            console.error('TrustLens Debug: Connection test error:', error);
+            console.error('TrustLens Debug: Error details:', {
+                name: error.name,
+                message: error.message,
+                stack: error.stack
+            });
+            
+            // Try alternative approach
+            this.tryAlternativeConnection();
+        }
+    }
+
+    async tryAlternativeConnection() {
+        console.log('TrustLens Debug: Trying alternative connection method...');
+        
+        try {
+            // Use a different approach - try to access via background script
+            const response = await chrome.runtime.sendMessage({
+                action: 'testSupabaseConnection',
+                url: this.supabaseUrl,
+                key: this.supabaseKey
+            });
+            
+            if (response && response.success) {
+                this.showStatus('Supabase connected via background script!', 'success');
+                document.getElementById('debugConnection').textContent = 'Connected ✓ (via background)';
+                document.getElementById('debugConnection').style.color = 'green';
+            } else {
+                this.showStatus(`Background connection failed: ${response?.error || 'Unknown error'}`, 'error');
+                document.getElementById('debugConnection').textContent = 'Failed (background)';
+                document.getElementById('debugConnection').style.color = 'red';
+            }
+        } catch (error) {
+            console.error('TrustLens Debug: Alternative connection failed:', error);
+            this.showStatus(`All connection methods failed: ${error.message}`, 'error');
+            document.getElementById('debugConnection').textContent = `Error: ${error.message}`;
+            document.getElementById('debugConnection').style.color = 'red';
+        }
+    }
+
+    updateDebugInfo() {
+        document.getElementById('debugDomain').textContent = this.currentDomain || 'None';
+        document.getElementById('debugUrl').textContent = this.supabaseUrl;
+        document.getElementById('debugKey').textContent = this.supabaseKey.substring(0, 20) + '...';
+        document.getElementById('debugConnection').textContent = 'Testing...';
+        document.getElementById('debugConnection').style.color = 'orange';
+    }
+
+
+    async loadCurrentSiteRating() {
+        if (!this.currentDomain) {
+            console.log('TrustLens Debug: No current domain');
+            return;
+        }
+
+        console.log('TrustLens Debug: Loading rating for domain:', this.currentDomain);
+        console.log('TrustLens Debug: Supabase URL:', this.supabaseUrl);
+        console.log('TrustLens Debug: Supabase Key (first 20 chars):', this.supabaseKey.substring(0, 20) + '...');
+
+        try {
+            const url = `${this.supabaseUrl}/rest/v1/news_data?domain=eq.${encodeURIComponent(this.currentDomain)}&select=*`;
+            console.log('TrustLens Debug: Request URL:', url);
+            
+            const response = await fetch(url, {
+                headers: {
+                    'apikey': this.supabaseKey,
+                    'Authorization': `Bearer ${this.supabaseKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            console.log('TrustLens Debug: Response status:', response.status);
+            console.log('TrustLens Debug: Response headers:', Object.fromEntries(response.headers.entries()));
+            
+            if (response.ok) {
+                const data = await response.json();
+                console.log('TrustLens Debug: Response data:', data);
+                
+                if (data && data.length > 0) {
+                    this.currentRating = data[0];
+                    console.log('TrustLens Debug: Found rating:', data[0]);
+                    this.updateRatingDisplay(data[0]);
+                } else {
+                    console.log('TrustLens Debug: No data found for domain');
+                    this.updateRatingDisplay(null);
+                }
+            } else {
+                const errorText = await response.text();
+                console.error('TrustLens Debug: API Error Response:', errorText);
+                throw new Error(`API Error: ${response.status} - ${errorText}`);
+            }
+        } catch (error) {
+            console.error('TrustLens Debug: Error loading rating:', error);
+            console.log('TrustLens Debug: Falling back to mock data...');
+            
+            // Fallback to mock data
+            this.loadMockRating();
+        }
+    }
+
+    loadMockRating() {
+        console.log('TrustLens Debug: Using mock data for domain:', this.currentDomain);
+        
+        if (window.getMockRating) {
+            const mockRating = window.getMockRating(this.currentDomain);
+            if (mockRating) {
+                this.currentRating = mockRating;
+                this.updateRatingDisplay(mockRating);
+                this.showStatus('Using mock data (Supabase unavailable)', 'info');
+            } else {
+                this.updateRatingDisplay(null);
+                this.showStatus('Domain not found in mock data', 'info');
+            }
+        } else {
             this.updateRatingDisplay(null);
+            this.showStatus('No data available', 'error');
         }
     }
 
     updateRatingDisplay(data) {
         const ratingValue = document.getElementById('ratingValue');
-        const votesCount = document.getElementById('votesCount');
         const ratingFill = document.getElementById('ratingFill');
         const ratingText = document.getElementById('ratingText');
+        const lastUpdated = document.getElementById('lastUpdated');
 
         if (data) {
             ratingValue.textContent = data.rating.toFixed(1);
-            votesCount.textContent = `${data.total_votes} vote${data.total_votes !== 1 ? 's' : ''}`;
             
             // Update rating bar
             const percentage = (data.rating / 10) * 100;
@@ -115,12 +277,18 @@ class TrustLensPopup {
             // Update rating text
             ratingText.textContent = this.getRatingText(data.rating);
             ratingText.style.color = this.getRatingColor(data.rating);
+            
+            // Update last updated time
+            if (data.created_at) {
+                const date = new Date(data.created_at);
+                lastUpdated.textContent = date.toLocaleDateString();
+            }
         } else {
             ratingValue.textContent = '-';
-            votesCount.textContent = 'No rating';
             ratingFill.style.width = '0%';
-            ratingText.textContent = 'No community rating available';
+            ratingText.textContent = 'No rating available in database';
             ratingText.style.color = '#999';
+            lastUpdated.textContent = '-';
         }
     }
 
@@ -138,71 +306,80 @@ class TrustLensPopup {
         return '#dc3545';
     }
 
-    async submitRating() {
-        if (!this.selectedRating || !this.currentDomain) return;
-
-        const submitBtn = document.getElementById('submitRating');
-        const originalText = submitBtn.textContent;
+    async loadStats() {
+        console.log('TrustLens Debug: Loading stats...');
         
         try {
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Submitting...';
-
-            const response = await fetch(`${this.apiBaseUrl}/rating`, {
-                method: 'POST',
+            // Get total domains count
+            const countUrl = `${this.supabaseUrl}/rest/v1/news_data?select=count`;
+            console.log('TrustLens Debug: Count URL:', countUrl);
+            
+            const countResponse = await fetch(countUrl, {
                 headers: {
+                    'apikey': this.supabaseKey,
+                    'Authorization': `Bearer ${this.supabaseKey}`,
                     'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    domain: this.currentDomain,
-                    rating: this.selectedRating,
-                    user_id: this.generateUserId()
-                })
+                    'Prefer': 'count=exact'
+                }
             });
-
-            if (response.ok) {
-                const data = await response.json();
-                this.showStatus('Rating submitted successfully!', 'success');
-                await this.loadCurrentSiteRating();
-                this.selectedRating = null;
-                document.querySelectorAll('.rating-btn').forEach(btn => {
-                    btn.classList.remove('selected');
-                });
+            
+            console.log('TrustLens Debug: Count response status:', countResponse.status);
+            
+            if (countResponse.ok) {
+                const countData = await countResponse.json();
+                console.log('TrustLens Debug: Count data:', countData);
+                document.getElementById('totalDomains').textContent = countData.length || '0';
             } else {
-                const errorData = await response.json();
-                throw new Error(errorData.error || 'Failed to submit rating');
+                console.error('TrustLens Debug: Count request failed:', countResponse.status);
+                this.loadMockStats();
+            }
+
+            // Get average rating
+            const avgUrl = `${this.supabaseUrl}/rest/v1/news_data?select=rating`;
+            console.log('TrustLens Debug: Average URL:', avgUrl);
+            
+            const avgResponse = await fetch(avgUrl, {
+                headers: {
+                    'apikey': this.supabaseKey,
+                    'Authorization': `Bearer ${this.supabaseKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            console.log('TrustLens Debug: Average response status:', avgResponse.status);
+            
+            if (avgResponse.ok) {
+                const avgData = await avgResponse.json();
+                console.log('TrustLens Debug: Average data:', avgData);
+                
+                if (avgData && avgData.length > 0) {
+                    const average = avgData.reduce((sum, item) => sum + item.rating, 0) / avgData.length;
+                    console.log('TrustLens Debug: Calculated average:', average);
+                    document.getElementById('avgRating').textContent = average.toFixed(1);
+                } else {
+                    console.log('TrustLens Debug: No data for average calculation');
+                    this.loadMockStats();
+                }
+            } else {
+                console.error('TrustLens Debug: Average request failed:', avgResponse.status);
+                this.loadMockStats();
             }
         } catch (error) {
-            console.error('Error submitting rating:', error);
-            this.showStatus(error.message, 'error');
-        } finally {
-            submitBtn.disabled = false;
-            submitBtn.textContent = originalText;
+            console.error('TrustLens Debug: Error loading stats:', error);
+            this.loadMockStats();
         }
     }
 
-    generateUserId() {
-        // Generate a simple user ID for tracking
-        let userId = localStorage.getItem('trustlens_user_id');
-        if (!userId) {
-            userId = 'user_' + Math.random().toString(36).substr(2, 9);
-            localStorage.setItem('trustlens_user_id', userId);
-        }
-        return userId;
-    }
-
-    async loadStats() {
-        try {
-            // Load top rated to get some stats
-            const response = await fetch(`${this.apiBaseUrl}/domains/top?limit=1`);
-            if (response.ok) {
-                const data = await response.json();
-                // This is a simplified approach - in a real app you'd have a dedicated stats endpoint
-                document.getElementById('totalDomains').textContent = 'Loading...';
-                document.getElementById('totalVotes').textContent = 'Loading...';
-            }
-        } catch (error) {
-            console.error('Error loading stats:', error);
+    loadMockStats() {
+        console.log('TrustLens Debug: Loading mock stats...');
+        
+        if (window.getMockStats) {
+            const stats = window.getMockStats();
+            document.getElementById('totalDomains').textContent = stats.totalDomains;
+            document.getElementById('avgRating').textContent = stats.averageRating;
+        } else {
+            document.getElementById('totalDomains').textContent = '30';
+            document.getElementById('avgRating').textContent = '7.2';
         }
     }
 
@@ -220,27 +397,63 @@ class TrustLensPopup {
 
     async showTopRated() {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/domains/top?limit=10`);
+            const response = await fetch(`${this.supabaseUrl}/rest/v1/news_data?select=*&order=rating.desc&limit=10`, {
+                headers: {
+                    'apikey': this.supabaseKey,
+                    'Authorization': `Bearer ${this.supabaseKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
             if (response.ok) {
                 const data = await response.json();
                 this.showDomainList(data, 'Top Rated Domains');
+            } else {
+                throw new Error('Supabase request failed');
             }
         } catch (error) {
             console.error('Error loading top rated:', error);
-            this.showStatus('Error loading top rated domains', 'error');
+            console.log('Falling back to mock data for top rated...');
+            this.showMockTopRated();
         }
     }
 
     async showLowestRated() {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/domains/lowest?limit=10`);
+            const response = await fetch(`${this.supabaseUrl}/rest/v1/news_data?select=*&order=rating.asc&limit=10`, {
+                headers: {
+                    'apikey': this.supabaseKey,
+                    'Authorization': `Bearer ${this.supabaseKey}`,
+                    'Content-Type': 'application/json'
+                }
+            });
             if (response.ok) {
                 const data = await response.json();
                 this.showDomainList(data, 'Lowest Rated Domains');
+            } else {
+                throw new Error('Supabase request failed');
             }
         } catch (error) {
             console.error('Error loading lowest rated:', error);
-            this.showStatus('Error loading lowest rated domains', 'error');
+            console.log('Falling back to mock data for lowest rated...');
+            this.showMockLowestRated();
+        }
+    }
+
+    showMockTopRated() {
+        if (window.getMockTopRated) {
+            const data = window.getMockTopRated(10);
+            this.showDomainList(data, 'Top Rated Domains (Mock Data)');
+        } else {
+            this.showStatus('Mock data not available', 'error');
+        }
+    }
+
+    showMockLowestRated() {
+        if (window.getMockLowestRated) {
+            const data = window.getMockLowestRated(10);
+            this.showDomainList(data, 'Lowest Rated Domains (Mock Data)');
+        } else {
+            this.showStatus('Mock data not available', 'error');
         }
     }
 
@@ -250,7 +463,7 @@ class TrustLensPopup {
             `<div class="domain-item">
                 <span class="domain-name">${domain.domain}</span>
                 <span class="domain-rating">${domain.rating.toFixed(1)}</span>
-                <span class="domain-votes">${domain.total_votes} votes</span>
+                <span class="domain-date">${new Date(domain.created_at).toLocaleDateString()}</span>
             </div>`
         ).join('');
 

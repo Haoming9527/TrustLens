@@ -1,0 +1,49 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment files
+.env
+.env.*
+!env.example
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Coverage / testing
+coverage/
+.nyc_output/
+
+# Build outputs
+dist/
+build/
+.cache/
+
+# Editor directories and files
+.vscode/
+.idea/
+*.swp
+
+# Database files
+trustlens.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Supabase local artifacts
+supabase/.temp/
+supabase/.branches/
+
+# Chrome extension artifacts (if built)
+extension/dist/
+
+

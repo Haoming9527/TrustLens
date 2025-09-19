@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrustLens Supabase Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { background-color: #d4edda; border-color: #c3e6cb; }
+        .error { background-color: #f8d7da; border-color: #f5c6cb; }
+        .info { background-color: #d1ecf1; border-color: #bee5eb; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 3px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 5px; background: #007bff; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+    </style>
+</head>
+<body>
+    <h1>TrustLens Supabase Connection Test</h1>
+    
+    <div class="test-section">
+        <h3>Configuration</h3>
+        <p><strong>Supabase URL:</strong> <span id="url">Loading...</span></p>
+        <p><strong>API Key:</strong> <span id="key">Loading...</span></p>
+    </div>
+    
+    <div class="test-section">
+        <h3>Tests</h3>
+        <button onclick="testConnection()">Test Basic Connection</button>
+        <button onclick="testTableAccess()">Test Table Access</button>
+        <button onclick="testSpecificDomain()">Test Specific Domain</button>
+        <button onclick="testAllData()">Get All Data</button>
+    </div>
+    
+    <div class="test-section">
+        <h3>Results</h3>
+        <div id="results">Click a test button to see results...</div>
+    </div>
+
+    <script>
+        // Your Supabase configuration
+        const SUPABASE_URL = 'https://vxxlcintbzgxbmocjbti.supabase.com';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZ4eGxjaW50YnpneGJtb2NqYnRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc5MzYzMzgsImV4cCI6MjA3MzUxMjMzOH0.RNkpKDpVSNxhDXGil9polPJk0URLYGl0j-QMw-6d0B8';
+        
+        // Display configuration
+        document.getElementById('url').textContent = SUPABASE_URL;
+        document.getElementById('key').textContent = SUPABASE_KEY.substring(0, 20) + '...';
+        
+        function log(message, type = 'info') {
+            const results = document.getElementById('results');
+            const timestamp = new Date().toLocaleTimeString();
+            const className = type === 'error' ? 'error' : type === 'success' ? 'success' : 'info';
+            results.innerHTML += `<div class="${className}"><strong>[${timestamp}]</strong> ${message}</div>`;
+        }
+        
+        async function testConnection() {
+            log('Testing basic connection...', 'info');
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/news_data?select=count&limit=1`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Connection successful! Status: ${response.status}`, 'success');
+                    log(`Response: ${JSON.stringify(data, null, 2)}`, 'info');
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Connection failed! Status: ${response.status}`, 'error');
+                    log(`Error: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Connection error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testTableAccess() {
+            log('Testing table access...', 'info');
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/news_data?select=*&limit=3`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ Table access successful! Found ${data.length} records`, 'success');
+                    log(`Sample data: ${JSON.stringify(data, null, 2)}`, 'info');
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Table access failed! Status: ${response.status}`, 'error');
+                    log(`Error: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Table access error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testSpecificDomain() {
+            log('Testing specific domain query...', 'info');
+            try {
+                const domain = 'cnn.com';
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/news_data?domain=eq.${domain}&select=*`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.length > 0) {
+                        log(`✅ Domain query successful! Found ${data.length} record(s) for ${domain}`, 'success');
+                        log(`Data: ${JSON.stringify(data, null, 2)}`, 'info');
+                    } else {
+                        log(`⚠️ No data found for domain: ${domain}`, 'info');
+                    }
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ Domain query failed! Status: ${response.status}`, 'error');
+                    log(`Error: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ Domain query error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testAllData() {
+            log('Getting all data...', 'info');
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/news_data?select=*&order=rating.desc`, {
+                    headers: {
+                        'apikey': SUPABASE_KEY,
+                        'Authorization': `Bearer ${SUPABASE_KEY}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    log(`✅ All data retrieved! Found ${data.length} records`, 'success');
+                    log(`Top 5 records: ${JSON.stringify(data.slice(0, 5), null, 2)}`, 'info');
+                } else {
+                    const errorText = await response.text();
+                    log(`❌ All data query failed! Status: ${response.status}`, 'error');
+                    log(`Error: ${errorText}`, 'error');
+                }
+            } catch (error) {
+                log(`❌ All data query error: ${error.message}`, 'error');
+            }
+        }
+    </script>
+</body>
+</html>
