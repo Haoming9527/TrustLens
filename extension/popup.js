@@ -64,6 +64,24 @@ class TrustLensPopup {
             this.toggleDebug();
         });
 
+        // About modal
+        document.getElementById('aboutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.showAboutModal();
+        });
+
+        document.getElementById('closeAboutModal').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.hideAboutModal();
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('aboutModal').addEventListener('click', (e) => {
+            if (e.target.id === 'aboutModal') {
+                this.hideAboutModal();
+            }
+        });
+
         // Keyboard shortcut for debug (Ctrl+D)
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'd') {
@@ -84,6 +102,18 @@ class TrustLensPopup {
             debugSection.style.display = 'none';
             debugToggle.textContent = 'Show Debug';
         }
+    }
+
+    showAboutModal() {
+        const modal = document.getElementById('aboutModal');
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    hideAboutModal() {
+        const modal = document.getElementById('aboutModal');
+        modal.classList.remove('show');
+        document.body.style.overflow = ''; // Restore scrolling
     }
 
     async testSupabaseConnection() {
