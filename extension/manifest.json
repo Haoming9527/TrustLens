@@ -6,12 +6,14 @@
   "permissions": [
     "activeTab",
     "storage",
-    "scripting"
+    "scripting",
+    "alarms",
+    "notifications"
   ],
   "host_permissions": [
     "http://*/*",
     "https://*/*",
-    "https://vxxlcintbzgxbmocjbti.supabase.com/*"
+    "https://vxxlcintbzgxbmocjbti.supabase.co/*"
   ],
   "background": {
     "service_worker": "background.js"

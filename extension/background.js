@@ -1,15 +1,53 @@
 // TrustLens Background Script
 class TrustLensBackground {
     constructor() {
-        this.supabaseUrl = 'YOUR_SUPABASE_URL'; // Will be set from config
-        this.supabaseKey = 'YOUR_SUPABASE_ANON_KEY'; // Will be set from config
+        this.supabaseUrl = 'YOUR_SUPABASE_URL'; // Will be overridden from storage
+        this.supabaseKey = 'YOUR_SUPABASE_ANON_KEY'; // Will be overridden from storage
+        this.reliableThreshold = 7; // rating >= 7 considered reliable
+        this.loggingEnabled = true; // cached kill switch
         this.init();
     }
 
     init() {
+        this.loadConfigFromStorage();
+        this.setupConfigChangeListener();
         this.setupInstallListener();
         this.setupTabUpdateListener();
         this.setupMessageListener();
+        this.setupAlarms();
+        this.setupNotificationClick();
+    }
+
+    async loadConfigFromStorage() {
+        try {
+            const keys = ['trustlens_supabase_url', 'trustlens_supabase_key', 'trustlens_logging_enabled'];
+            const data = await chrome.storage.local.get(keys);
+            if (data.trustlens_supabase_url) this.supabaseUrl = data.trustlens_supabase_url;
+            if (data.trustlens_supabase_key) this.supabaseKey = data.trustlens_supabase_key;
+            if (typeof data.trustlens_logging_enabled === 'boolean') this.loggingEnabled = data.trustlens_logging_enabled;
+        } catch (e) {
+            console.warn('Failed to load Supabase config from storage', e);
+        }
+    }
+
+    setupConfigChangeListener() {
+        try {
+            chrome.storage.onChanged.addListener((changes, areaName) => {
+                if (areaName !== 'local') return;
+                if (changes['trustlens_supabase_url']) {
+                    this.supabaseUrl = changes['trustlens_supabase_url'].newValue || this.supabaseUrl;
+                }
+                if (changes['trustlens_supabase_key']) {
+                    this.supabaseKey = changes['trustlens_supabase_key'].newValue || this.supabaseKey;
+                }
+                if (changes['trustlens_logging_enabled']) {
+                    this.loggingEnabled = !!changes['trustlens_logging_enabled'].newValue;
+                    console.log('[TrustLens] Logging enabled set to', this.loggingEnabled);
+                }
+            });
+        } catch (e) {
+            console.warn('Failed to set up config change listener', e);
+        }
     }
 
     setupInstallListener() {
@@ -45,6 +83,39 @@ class TrustLensBackground {
                 case 'testSupabaseConnection':
                     this.testSupabaseConnection(request.url, request.key).then(sendResponse);
                     return true;
+
+                case 'setConfig':
+                    if (request.url) this.supabaseUrl = request.url;
+                    if (request.key) this.supabaseKey = request.key;
+                    sendResponse({ ok: true });
+                    return true;
+
+                case 'logEngagement':
+                    this.logEngagement(request.payload).then(sendResponse);
+                    return true;
+
+                case 'getWeeklySummary':
+                    this.getWeeklySummary().then(sendResponse);
+                    return true;
+            }
+        });
+    }
+
+    setupAlarms() {
+        // Create weekly alarm if not present
+        chrome.alarms.create('trustlens-weekly-feedback', { periodInMinutes: 60 * 24 * 7 });
+
+        chrome.alarms.onAlarm.addListener((alarm) => {
+            if (alarm.name === 'trustlens-weekly-feedback') {
+                this.showWeeklyFeedbackNotification();
+            }
+        });
+    }
+
+    setupNotificationClick() {
+        chrome.notifications.onClicked.addListener((notificationId) => {
+            if (notificationId === 'trustlens-weekly-summary') {
+                chrome.action.openPopup();
             }
         });
     }
@@ -57,6 +128,17 @@ class TrustLensBackground {
             if (rating) {
                 this.updateBadge(tabId, rating);
                 this.injectRatingWidget(tabId, domain, rating);
+                // Log engagement (only if enabled)
+                if (this.loggingEnabled) {
+                    this.logEngagement({
+                        domain,
+                        rating: rating.rating,
+                        reliable: rating.rating >= this.reliableThreshold,
+                        ts: Date.now()
+                    });
+                } else {
+                    console.log('[TrustLens] Skipping engagement log because logging is disabled');
+                }
             } else {
                 this.clearBadge(tabId);
             }
@@ -74,8 +156,84 @@ class TrustLensBackground {
         }
     }
 
+    async logEngagement(event) {
+        try {
+            if (!this.loggingEnabled) {
+                console.log('[TrustLens] logEngagement skipped (disabled)');
+                return { ok: true, skipped: true };
+            }
+            const key = 'trustlens_engagements';
+            const data = await chrome.storage.local.get([key]);
+            const list = Array.isArray(data[key]) ? data[key] : [];
+
+            // Keep only last 90 days to cap storage
+            const ninetyDaysAgo = Date.now() - 90 * 24 * 60 * 60 * 1000;
+            const trimmed = list.filter(item => item.ts >= ninetyDaysAgo);
+
+            trimmed.push({
+                domain: event.domain,
+                rating: event.rating,
+                reliable: !!event.reliable,
+                ts: event.ts || Date.now()
+            });
+
+            await chrome.storage.local.set({ [key]: trimmed });
+            return { ok: true };
+        } catch (e) {
+            console.error('Error logging engagement', e);
+            return { ok: false, error: e.message };
+        }
+    }
+
+    async getWeeklySummary() {
+        const key = 'trustlens_engagements';
+        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+        const { [key]: list = [] } = await chrome.storage.local.get([key]);
+        const recent = (list || []).filter(item => item.ts >= weekAgo);
+
+        const total = recent.length;
+        const reliable = recent.filter(i => i.reliable).length;
+        const unreliable = recent.filter(i => !i.reliable).length;
+
+        const reliablePct = total ? Math.round((reliable / total) * 100) : 0;
+        const unreliablePct = total ? Math.round((unreliable / total) * 100) : 0;
+
+        // Top domains engaged
+        const counts = {};
+        recent.forEach(i => { counts[i.domain] = (counts[i.domain] || 0) + 1; });
+        const topDomains = Object.entries(counts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 5)
+            .map(([domain, count]) => ({ domain, count }));
+
+        return { total, reliable, unreliable, reliablePct, unreliablePct, topDomains };
+    }
+
+    async showWeeklyFeedbackNotification() {
+        try {
+            const summary = await this.getWeeklySummary();
+            const title = 'Your Weekly TrustLens Feedback';
+            const message = summary.total
+                ? `This week: ${summary.reliablePct}% reliable, ${summary.unreliablePct}% unreliable across ${summary.total} engagements.`
+                : 'No engagements logged this week. Browse to see insights!';
+
+            chrome.notifications.create('trustlens-weekly-summary', {
+                type: 'basic',
+                iconUrl: 'icons/icon48.png',
+                title,
+                message
+            });
+        } catch (e) {
+            console.error('Failed to show weekly feedback notification', e);
+        }
+    }
+
     async getDomainRating(domain) {
         try {
+            // Ensure config is loaded
+            if (!this.supabaseUrl || this.supabaseUrl.includes('YOUR_SUPABASE_URL')) {
+                await this.loadConfigFromStorage();
+            }
             const response = await fetch(`${this.supabaseUrl}/rest/v1/news_data?domain=eq.${encodeURIComponent(domain)}&select=*`, {
                 headers: {
                     'apikey': this.supabaseKey,

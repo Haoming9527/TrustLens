@@ -48,6 +48,35 @@
             </div>
         </div>
 
+        <div class="weekly-section" id="weeklySection">
+            <h3>Weekly Feedback</h3>
+            <div class="weekly-summary">
+                <div class="weekly-bar">
+                    <div class="weekly-reliable" id="weeklyReliable" style="width:0%"></div>
+                    <div class="weekly-unreliable" id="weeklyUnreliable" style="width:0%"></div>
+                </div>
+                <div class="weekly-stats">
+                    <span id="weeklyReliableText">0% reliable</span>
+                    <span id="weeklyUnreliableText">0% unreliable</span>
+                    <span id="weeklyTotalText">0 engagements</span>
+                </div>
+                <div class="weekly-top" id="weeklyTop"></div>
+            </div>
+        </div>
+
+        <div class="privacy-section" id="privacySection">
+            <h3>Privacy</h3>
+            <div class="privacy-controls">
+                <label class="toggle">
+                    <input type="checkbox" id="loggingToggle">
+                    <span class="slider"></span>
+                    <span class="label">Enable weekly engagement logging</span>
+                </label>
+                <button id="clearEngagements" class="clear-btn">Clear engagement history</button>
+            </div>
+            <div class="privacy-note">Logging stores only domain and timestamp locally for weekly feedback. No PII is collected.</div>
+        </div>
+
         <div class="status-message" id="statusMessage"></div>
         
         <div class="debug-section" id="debugSection" style="display: none;">

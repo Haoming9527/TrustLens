@@ -15,6 +15,9 @@ class TrustLensPopup {
         await this.testSupabaseConnection();
         await this.loadCurrentSiteRating();
         await this.loadStats();
+        await this.loadWeeklySummary();
+        this.setupRealtimeWeeklyUpdates();
+        await this.loadPrivacySettings();
     }
 
     async getCurrentTab() {
@@ -88,6 +91,19 @@ class TrustLensPopup {
                 e.preventDefault();
                 this.toggleDebug();
             }
+        });
+
+        // Privacy controls
+        document.getElementById('loggingToggle').addEventListener('change', async (e) => {
+            const enabled = e.target.checked;
+            await chrome.storage.local.set({ trustlens_logging_enabled: enabled });
+            this.showStatus(enabled ? 'Logging enabled' : 'Logging disabled', 'info');
+        });
+
+        document.getElementById('clearEngagements').addEventListener('click', async () => {
+            await chrome.storage.local.set({ trustlens_engagements: [] });
+            await this.loadWeeklySummary();
+            this.showStatus('Engagement history cleared', 'success');
         });
     }
 
@@ -411,6 +427,49 @@ class TrustLensPopup {
             document.getElementById('totalDomains').textContent = '30';
             document.getElementById('avgRating').textContent = '7.2';
         }
+    }
+
+    async loadWeeklySummary() {
+        try {
+            const summary = await chrome.runtime.sendMessage({ action: 'getWeeklySummary' });
+            if (!summary) return;
+
+            const reliablePct = summary.reliablePct || 0;
+            const unreliablePct = summary.unreliablePct || 0;
+            const total = summary.total || 0;
+
+            document.getElementById('weeklyReliable').style.width = `${reliablePct}%`;
+            document.getElementById('weeklyUnreliable').style.width = `${unreliablePct}%`;
+
+            document.getElementById('weeklyReliableText').textContent = `${reliablePct}% reliable`;
+            document.getElementById('weeklyUnreliableText').textContent = `${unreliablePct}% unreliable`;
+            document.getElementById('weeklyTotalText').textContent = `${total} engagements`;
+
+            const top = (summary.topDomains || [])
+                .map(d => `${d.domain} (${d.count})`)
+                .join(', ');
+            document.getElementById('weeklyTop').textContent = top ? `Most visited: ${top}` : '';
+        } catch (e) {
+            console.error('Failed to load weekly summary', e);
+        }
+    }
+
+    setupRealtimeWeeklyUpdates() {
+        try {
+            chrome.storage.onChanged.addListener((changes, areaName) => {
+                if (areaName === 'local' && changes && changes['trustlens_engagements']) {
+                    this.loadWeeklySummary();
+                }
+            });
+        } catch (e) {
+            console.error('Failed to set up realtime weekly updates', e);
+        }
+    }
+
+    async loadPrivacySettings() {
+        const { trustlens_logging_enabled = true } = await chrome.storage.local.get(['trustlens_logging_enabled']);
+        const toggle = document.getElementById('loggingToggle');
+        toggle.checked = !!trustlens_logging_enabled;
     }
 
     showStatus(message, type = 'info') {

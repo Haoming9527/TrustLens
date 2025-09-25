@@ -13,6 +13,38 @@ class TrustLensContent {
         this.currentDomain = this.extractDomain(window.location.href);
         this.setupPageAnalysis();
         this.setupMessageListener();
+        this.persistConfig();
+        this.pushConfigToBackground();
+    }
+
+    async persistConfig() {
+        try {
+            if (this.supabaseUrl && !this.supabaseUrl.includes('YOUR_SUPABASE_URL')) {
+                await chrome.storage.local.set({ 'trustlens_supabase_url': this.supabaseUrl });
+            }
+            if (this.supabaseKey && !this.supabaseKey.includes('YOUR_SUPABASE_ANON_KEY')) {
+                await chrome.storage.local.set({ 'trustlens_supabase_key': this.supabaseKey });
+            }
+        } catch (e) {
+            // no-op on failure
+        }
+    }
+
+    async pushConfigToBackground() {
+        try {
+            if (
+                this.supabaseUrl && !this.supabaseUrl.includes('YOUR_SUPABASE_URL') &&
+                this.supabaseKey && !this.supabaseKey.includes('YOUR_SUPABASE_ANON_KEY')
+            ) {
+                await chrome.runtime.sendMessage({
+                    action: 'setConfig',
+                    url: this.supabaseUrl,
+                    key: this.supabaseKey
+                });
+            }
+        } catch (e) {
+            // ignore
+        }
     }
 
     extractDomain(url) {
