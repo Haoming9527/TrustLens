@@ -9,13 +9,43 @@
 <body>
     <div class="container">
         <header class="header">
-            <div class="logo">
-                <img src="icons/icon32.png" alt="TrustLens" class="logo-img">
-                <h1>TrustLens</h1>
+            <div class="header-content">
+                <div class="logo">
+                    <img src="icons/icon32.png" alt="TrustLens" class="logo-img">
+                    <h1>TrustLens</h1>
+                </div>
+                <button class="hamburger-btn" id="hamburgerBtn">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
             </div>
             <p class="subtitle">Community-Powered Misinformation Defense</p>
-            <button class="about-btn" id="aboutBtn">About</button>
         </header>
+
+        <!-- Hamburger Menu Overlay -->
+        <div class="hamburger-menu" id="hamburgerMenu">
+            <div class="menu-content">
+                <div class="menu-header">
+                    <h3>Menu</h3>
+                    <button class="close-menu" id="closeMenu">&times;</button>
+                </div>
+                <div class="menu-items">
+                    <button class="menu-item" id="menuAbout">
+                        <span class="menu-icon">ℹ️</span>
+                        <span class="menu-text">About TrustLens</span>
+                    </button>
+                    <button class="menu-item" id="menuPrivacy">
+                        <span class="menu-icon">🔒</span>
+                        <span class="menu-text">Privacy Settings</span>
+                    </button>
+                    <button class="menu-item" id="menuDebug">
+                        <span class="menu-icon">🔧</span>
+                        <span class="menu-text">Debug Info</span>
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <div class="current-site" id="currentSite">
             <div class="site-info">
@@ -64,7 +94,7 @@
             </div>
         </div>
 
-        <div class="privacy-section" id="privacySection">
+        <div class="privacy-section hidden" id="privacySection">
             <h3>Privacy</h3>
             <div class="privacy-controls">
                 <label class="toggle">
@@ -118,15 +148,14 @@
             <div class="modal-body">
                 <div class="about-section">
                     <h3>What is TrustLens?</h3>
-                    <p>TrustLens is a community-powered browser extension that helps you identify potentially unreliable websites and misinformation. Our system relies on community ratings to provide real-time trust scores for websites you visit.</p>
+                    <p>TrustLens is a browser extension that helps you identify potentially unreliable websites and misinformation. Our system relies on ratings to provide real-time trust scores for websites you visit.</p>
                 </div>
                 
                 <div class="about-section">
                     <h3>How it works</h3>
                     <ul>
-                        <li>Community members rate websites based on reliability</li>
+                        <li>TrustLens gets the ratings based on highly reliable and credible Media Bias / Fact Check media bias organisation and a local TrustLens database that is complied locally. This local database is updated weekly by the community.</li>
                         <li>TrustLens displays these ratings when you visit sites</li>
-                        <li>Help others by rating websites you visit</li>
                         <li>Stay informed about website credibility</li>
                     </ul>
                 </div>
@@ -160,7 +189,53 @@
         </div>
     </div>
 
+    <!-- Privacy Settings Modal -->
+    <div class="privacy-modal" id="privacyModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Privacy Settings</h2>
+                <button class="close-modal" id="closePrivacyModal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="privacy-section">
+                    <h3>Privacy Controls</h3>
+                    <div class="privacy-controls">
+                        <label class="toggle">
+                            <input type="checkbox" id="modalLoggingToggle">
+                            <span class="slider"></span>
+                            <span class="label">Enable weekly engagement logging</span>
+                        </label>
+                        <button id="modalClearEngagements" class="clear-btn">Clear engagement history</button>
+                    </div>
+                    <div class="privacy-note">Logging stores only domain and timestamp locally for weekly feedback. No PII is collected.</div>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>Data Collection</h3>
+                    <p>TrustLens respects your privacy and only collects minimal data necessary for functionality:</p>
+                    <ul>
+                        <li><strong>Domain names</strong> - To provide trust ratings</li>
+                        <li><strong>Timestamps</strong> - For weekly feedback calculations</li>
+                        <li><strong>No personal information</strong> - We don't collect names, emails, or browsing history</li>
+                    </ul>
+                </div>
+
+                <div class="privacy-section">
+                    <h3>Your Rights</h3>
+                    <p>You have full control over your data:</p>
+                    <ul>
+                        <li>Enable or disable logging at any time</li>
+                        <li>Clear your engagement history completely</li>
+                        <li>All data is stored locally on your device</li>
+                        <li>No data is sent to external servers without your consent</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="config.js"></script>
+    <script src="mbfc-service.js"></script>
     <script src="mock-data.js"></script>
     <script src="popup.js"></script>
 </body>

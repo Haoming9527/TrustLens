@@ -5,6 +5,7 @@ class TrustLensPopup {
         this.supabaseKey = window.TRUSTLENS_CONFIG?.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
         this.currentDomain = null;
         this.currentRating = null;
+        this.mbfcService = new MBFCService();
         
         this.init();
     }
@@ -67,10 +68,34 @@ class TrustLensPopup {
             this.toggleDebug();
         });
 
-        // About modal
-        document.getElementById('aboutBtn').addEventListener('click', (e) => {
+        // Hamburger menu
+        document.getElementById('hamburgerBtn').addEventListener('click', (e) => {
             e.preventDefault();
+            this.toggleHamburgerMenu();
+        });
+
+        document.getElementById('closeMenu').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.hideHamburgerMenu();
+        });
+
+        // Menu items
+        document.getElementById('menuAbout').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.hideHamburgerMenu();
             this.showAboutModal();
+        });
+
+        document.getElementById('menuPrivacy').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.hideHamburgerMenu();
+            this.showPrivacyModal();
+        });
+
+        document.getElementById('menuDebug').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.hideHamburgerMenu();
+            this.toggleDebug();
         });
 
         document.getElementById('closeAboutModal').addEventListener('click', (e) => {
@@ -85,6 +110,26 @@ class TrustLensPopup {
             }
         });
 
+        // Close hamburger menu when clicking outside
+        document.getElementById('hamburgerMenu').addEventListener('click', (e) => {
+            if (e.target.id === 'hamburgerMenu') {
+                this.hideHamburgerMenu();
+            }
+        });
+
+        // Privacy modal
+        document.getElementById('closePrivacyModal').addEventListener('click', (e) => {
+            e.preventDefault();
+            this.hidePrivacyModal();
+        });
+
+        // Close privacy modal when clicking outside
+        document.getElementById('privacyModal').addEventListener('click', (e) => {
+            if (e.target.id === 'privacyModal') {
+                this.hidePrivacyModal();
+            }
+        });
+
         // Keyboard shortcut for debug (Ctrl+D)
         document.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'd') {
@@ -93,7 +138,7 @@ class TrustLensPopup {
             }
         });
 
-        // Privacy controls
+        // Privacy controls (main page - now hidden)
         document.getElementById('loggingToggle').addEventListener('change', async (e) => {
             const enabled = e.target.checked;
             await chrome.storage.local.set({ trustlens_logging_enabled: enabled });
@@ -101,6 +146,19 @@ class TrustLensPopup {
         });
 
         document.getElementById('clearEngagements').addEventListener('click', async () => {
+            await chrome.storage.local.set({ trustlens_engagements: [] });
+            await this.loadWeeklySummary();
+            this.showStatus('Engagement history cleared', 'success');
+        });
+
+        // Privacy modal controls
+        document.getElementById('modalLoggingToggle').addEventListener('change', async (e) => {
+            const enabled = e.target.checked;
+            await chrome.storage.local.set({ trustlens_logging_enabled: enabled });
+            this.showStatus(enabled ? 'Logging enabled' : 'Logging disabled', 'info');
+        });
+
+        document.getElementById('modalClearEngagements').addEventListener('click', async () => {
             await chrome.storage.local.set({ trustlens_engagements: [] });
             await this.loadWeeklySummary();
             this.showStatus('Engagement history cleared', 'success');
@@ -130,6 +188,56 @@ class TrustLensPopup {
         const modal = document.getElementById('aboutModal');
         modal.classList.remove('show');
         document.body.style.overflow = ''; // Restore scrolling
+    }
+
+    toggleHamburgerMenu() {
+        const menu = document.getElementById('hamburgerMenu');
+        const btn = document.getElementById('hamburgerBtn');
+        
+        if (menu.classList.contains('show')) {
+            this.hideHamburgerMenu();
+        } else {
+            this.showHamburgerMenu();
+        }
+    }
+
+    showHamburgerMenu() {
+        const menu = document.getElementById('hamburgerMenu');
+        const btn = document.getElementById('hamburgerBtn');
+        
+        menu.classList.add('show');
+        btn.classList.add('active');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+    }
+
+    hideHamburgerMenu() {
+        const menu = document.getElementById('hamburgerMenu');
+        const btn = document.getElementById('hamburgerBtn');
+        
+        menu.classList.remove('show');
+        btn.classList.remove('active');
+        document.body.style.overflow = ''; // Restore scrolling
+    }
+
+    showPrivacyModal() {
+        const modal = document.getElementById('privacyModal');
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden'; // Prevent background scrolling
+        
+        // Load current privacy settings into modal
+        this.loadPrivacySettingsToModal();
+    }
+
+    hidePrivacyModal() {
+        const modal = document.getElementById('privacyModal');
+        modal.classList.remove('show');
+        document.body.style.overflow = ''; // Restore scrolling
+    }
+
+    async loadPrivacySettingsToModal() {
+        const { trustlens_logging_enabled = true } = await chrome.storage.local.get(['trustlens_logging_enabled']);
+        const modalToggle = document.getElementById('modalLoggingToggle');
+        modalToggle.checked = !!trustlens_logging_enabled;
     }
 
     async testSupabaseConnection() {
@@ -243,47 +351,46 @@ class TrustLensPopup {
             return;
         }
 
-        console.log('TrustLens Debug: Loading rating for domain:', this.currentDomain);
-        console.log('TrustLens Debug: Supabase URL:', this.supabaseUrl);
-        console.log('TrustLens Debug: Supabase Key (first 20 chars):', this.supabaseKey.substring(0, 20) + '...');
+        console.log('TrustLens Debug: Loading enhanced rating for domain:', this.currentDomain);
 
         try {
-            const url = `${this.supabaseUrl}/rest/v1/news_data?domain=eq.${encodeURIComponent(this.currentDomain)}&select=*`;
-            console.log('TrustLens Debug: Request URL:', url);
-            
-            const response = await fetch(url, {
-                headers: {
-                    'apikey': this.supabaseKey,
-                    'Authorization': `Bearer ${this.supabaseKey}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            console.log('TrustLens Debug: Response status:', response.status);
-            console.log('TrustLens Debug: Response headers:', Object.fromEntries(response.headers.entries()));
-            
-            if (response.ok) {
-                const data = await response.json();
-                console.log('TrustLens Debug: Response data:', data);
+            // First, try to get local rating from Supabase
+            let localRating = null;
+            try {
+                const url = `${this.supabaseUrl}/rest/v1/news_data?domain=eq.${encodeURIComponent(this.currentDomain)}&select=*`;
+                const response = await fetch(url, {
+                    headers: {
+                        'apikey': this.supabaseKey,
+                        'Authorization': `Bearer ${this.supabaseKey}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
                 
-                if (data && data.length > 0) {
-                    this.currentRating = data[0];
-                    console.log('TrustLens Debug: Found rating:', data[0]);
-                    this.updateRatingDisplay(data[0]);
-                } else {
-                    console.log('TrustLens Debug: No data found for domain');
-                    this.updateRatingDisplay(null);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0) {
+                        localRating = data[0];
+                        console.log('TrustLens Debug: Found local rating:', localRating);
+                    }
                 }
+            } catch (error) {
+                console.log('TrustLens Debug: Local rating not available:', error.message);
+            }
+
+            // Get enhanced rating combining local and MBFC data
+            const enhancedRating = await this.mbfcService.getEnhancedRating(this.currentDomain, localRating);
+            
+            if (enhancedRating) {
+                this.currentRating = enhancedRating;
+                console.log('TrustLens Debug: Enhanced rating:', enhancedRating);
+                this.updateEnhancedRatingDisplay(enhancedRating);
             } else {
-                const errorText = await response.text();
-                console.error('TrustLens Debug: API Error Response:', errorText);
-                throw new Error(`API Error: ${response.status} - ${errorText}`);
+                console.log('TrustLens Debug: No enhanced rating available, falling back to mock data...');
+                this.loadMockRating();
             }
         } catch (error) {
-            console.error('TrustLens Debug: Error loading rating:', error);
+            console.error('TrustLens Debug: Error loading enhanced rating:', error);
             console.log('TrustLens Debug: Falling back to mock data...');
-            
-            // Fallback to mock data
             this.loadMockRating();
         }
     }
@@ -335,6 +442,83 @@ class TrustLensPopup {
             ratingText.textContent = 'No rating available in database';
             ratingText.style.color = '#999';
             lastUpdated.textContent = '-';
+        }
+    }
+
+    updateEnhancedRatingDisplay(enhancedData) {
+        const ratingValue = document.getElementById('ratingValue');
+        const ratingFill = document.getElementById('ratingFill');
+        const ratingText = document.getElementById('ratingText');
+        const lastUpdated = document.getElementById('lastUpdated');
+        const ratingSource = document.getElementById('ratingSource');
+
+        if (enhancedData) {
+            ratingValue.textContent = enhancedData.score.toFixed(1);
+            
+            // Update rating bar
+            const percentage = (enhancedData.score / 100) * 100;
+            ratingFill.style.width = `${percentage}%`;
+            
+            // Update rating text with enhanced information
+            ratingText.textContent = enhancedData.label;
+            ratingText.style.color = enhancedData.color;
+            
+            // Update source information
+            if (enhancedData.sources && enhancedData.sources.length > 0) {
+                ratingSource.textContent = `Sources: ${enhancedData.sources.join(', ')}`;
+            } else {
+                ratingSource.textContent = 'TrustLens Enhanced Database';
+            }
+            
+            // Update last updated time
+            if (enhancedData.lastUpdated) {
+                const date = new Date(enhancedData.lastUpdated);
+                lastUpdated.textContent = date.toLocaleDateString();
+            }
+
+            // Add detailed information if available
+            this.addDetailedRatingInfo(enhancedData);
+        } else {
+            ratingValue.textContent = '-';
+            ratingFill.style.width = '0%';
+            ratingText.textContent = 'No rating available';
+            ratingText.style.color = '#999';
+            lastUpdated.textContent = '-';
+            ratingSource.textContent = 'TrustLens Database';
+        }
+    }
+
+    addDetailedRatingInfo(enhancedData) {
+        // Add detailed MBFC information if available
+        if (enhancedData.details && enhancedData.details.mbfc) {
+            const mbfcData = enhancedData.details.mbfc;
+            
+            // Create or update detailed info section
+            let detailsSection = document.getElementById('ratingDetails');
+            if (!detailsSection) {
+                detailsSection = document.createElement('div');
+                detailsSection.id = 'ratingDetails';
+                detailsSection.className = 'rating-details';
+                document.getElementById('currentSite').appendChild(detailsSection);
+            }
+
+            detailsSection.innerHTML = `
+                <div class="rating-breakdown">
+                    <h4>Rating Breakdown</h4>
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">Bias:</span>
+                        <span class="breakdown-value" style="color: ${mbfcData.bias.color}">${mbfcData.bias.label}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">Factual Reporting:</span>
+                        <span class="breakdown-value" style="color: ${mbfcData.factual.color}">${mbfcData.factual.label}</span>
+                    </div>
+                    <div class="breakdown-item">
+                        <span class="breakdown-label">Country:</span>
+                        <span class="breakdown-value">${mbfcData.metadata.country}</span>
+                    </div>
+                </div>
+            `;
         }
     }
 
